@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task Scheduler — Algorithm Lab</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --card: #16161f;
+    --border: #252535;
+    --accent: #6ee7b7;
+    --accent2: #818cf8;
+    --warn: #fb923c;
+    --danger: #f87171;
+    --muted: #4b4b6a;
+    --text: #e2e8f0;
+    --text-dim: #8888aa;
+    --high: #f87171;
+    --medium: #fbbf24;
+    --low: #34d399;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(110,231,183,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(110,231,183,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  header {
+    margin-bottom: 2.5rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1.5rem;
+  }
+
+  .badge {
+    display: inline-block;
+    background: rgba(110,231,183,0.1);
+    border: 1px solid rgba(110,231,183,0.3);
+    color: var(--accent);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    padding: 0.2rem 0.6rem;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 800;
+    background: linear-gradient(135deg, #e2e8f0 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+  }
+
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+    letter-spacing: 0.05em;
+  }
+
+  /* === Add Task Panel === */
+  .add-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .add-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+
+  .panel-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1rem;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+    gap: 0.75rem;
+    align-items: end;
+  }
+
+  @media (max-width: 768px) {
+    .form-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  .field label {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.35rem;
+  }
+
+  .field input, .field select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    padding: 0.55rem 0.75rem;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+
+  .field input:focus, .field select:focus {
+    border-color: var(--accent);
+  }
+
+  .btn {
+    background: var(--accent);
+    color: #0a0a0f;
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 0.6rem 1.2rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: opacity 0.2s, transform 0.1s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { opacity: 0.85; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-danger {
+    background: transparent;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    font-size: 0.7rem;
+    padding: 0.3rem 0.6rem;
+  }
+
+  /* === Layout grid === */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  .full-width { grid-column: 1 / -1; }
+
+  /* === Cards === */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+
+  .complexity-tag {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 2px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .o-nlogn { background: rgba(110,231,183,0.1); color: var(--accent); border: 1px solid rgba(110,231,183,0.25); }
+  .o-n     { background: rgba(129,140,248,0.1); color: var(--accent2); border: 1px solid rgba(129,140,248,0.25); }
+  .o-1     { background: rgba(52,211,153,0.1);  color: #34d399;        border: 1px solid rgba(52,211,153,0.25); }
+
+  /* === Task list === */
+  .task-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+  .task-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    transition: border-color 0.2s;
+    animation: slideIn 0.25s ease-out;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  .task-row.overlap { border-left-color: var(--danger); background: rgba(248,113,113,0.05); }
+  .task-row.High    { border-left-color: var(--high); }
+  .task-row.Medium  { border-left-color: var(--medium); }
+  .task-row.Low     { border-left-color: var(--low); }
+
+  .task-name { font-size: 0.83rem; font-weight: 600; }
+  .task-time { font-size: 0.7rem; color: var(--text-dim); }
+
+  .priority-badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 0.15rem 0.45rem;
+    text-transform: uppercase;
+  }
+
+  .priority-badge.High   { background: rgba(248,113,113,0.15); color: var(--high); }
+  .priority-badge.Medium { background: rgba(251,191,36,0.15);  color: var(--medium); }
+  .priority-badge.Low    { background: rgba(52,211,153,0.15);  color: var(--low); }
+
+  .overlap-indicator {
+    font-size: 0.6rem;
+    color: var(--danger);
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+
+  /* === Groups === */
+  .group-section { margin-bottom: 1rem; }
+  .group-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .group-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    font-size: 0.6rem;
+    font-weight: 700;
+  }
+  .group-High   .group-label { color: var(--high); }
+  .group-Medium .group-label { color: var(--medium); }
+  .group-Low    .group-label { color: var(--low); }
+  .group-High   .group-count { background: rgba(248,113,113,0.2); color: var(--high); }
+  .group-Medium .group-count { background: rgba(251,191,36,0.2);  color: var(--medium); }
+  .group-Low    .group-count { background: rgba(52,211,153,0.2);  color: var(--low); }
+
+  .group-tasks { display: flex; flex-direction: column; gap: 0.3rem; }
+
+  /* === Overlap detail === */
+  .overlap-pair {
+    padding: 0.6rem 0.85rem;
+    background: rgba(248,113,113,0.05);
+    border: 1px solid rgba(248,113,113,0.2);
+    border-left: 3px solid var(--danger);
+    font-size: 0.75rem;
+    margin-bottom: 0.4rem;
+    animation: slideIn 0.25s ease-out;
+  }
+
+  .overlap-pair-title { font-weight: 600; color: var(--danger); margin-bottom: 0.2rem; }
+  .overlap-pair-info  { color: var(--text-dim); font-size: 0.67rem; }
+
+  /* === Memory section === */
+  .mem-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .mem-stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.85rem;
+  }
+
+  .mem-stat-label { font-size: 0.6rem; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.35rem; }
+  .mem-stat-value { font-family: 'Syne', sans-serif; font-size: 1.3rem; font-weight: 800; color: var(--accent); }
+  .mem-stat-unit  { font-size: 0.65rem; color: var(--text-dim); }
+
+  .complexity-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+  .complexity-table th {
+    text-align: left;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .complexity-table td {
+    padding: 0.5rem 0.6rem;
+    border-bottom: 1px solid rgba(37,37,53,0.6);
+    color: var(--text);
+  }
+  .complexity-table tr:last-child td { border-bottom: none; }
+
+  /* === Console / Code output === */
+  .console {
+    background: #07070d;
+    border: 1px solid var(--border);
+    padding: 1rem;
+    font-size: 0.72rem;
+    color: var(--accent);
+    max-height: 200px;
+    overflow-y: auto;
+    line-height: 1.7;
+  }
+
+  .console .log-line { color: var(--text-dim); }
+  .console .log-ok   { color: var(--accent); }
+  .console .log-warn { color: var(--warn); }
+  .console .log-err  { color: var(--danger); }
+
+  /* === Controls bar === */
+  .controls-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+    padding: 1.5rem;
+    letter-spacing: 0.05em;
+  }
+
+  select option { background: #16161f; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="badge">Advanced Algorithms</div>
+    <h1>Task Scheduler</h1>
+    <div class="subtitle">// Efficient sorting · grouping · overlap detection · memory analysis</div>
+  </header>
+
+  <!-- ADD TASK -->
+  <div class="add-panel">
+    <div class="panel-title">// add_task()</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Task Name</label>
+        <input id="inp-name" type="text" placeholder="e.g. Code Review" />
+      </div>
+      <div class="field">
+        <label>Start (HH:MM)</label>
+        <input id="inp-start" type="time" value="09:00" />
+      </div>
+      <div class="field">
+        <label>End (HH:MM)</label>
+        <input id="inp-end" type="time" value="10:00" />
+      </div>
+      <div class="field">
+        <label>Priority</label>
+        <select id="inp-priority">
+          <option value="High">High</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="Low">Low</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn" onclick="addTask()">+ Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls-bar">
+    <button class="btn btn-secondary" onclick="loadDemo()">Load Demo Data</button>
+    <button class="btn btn-secondary" onclick="clearAll()">Clear All</button>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+
+    <!-- SORTED TASKS -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Sorted by Start Time</span>
+        <span class="complexity-tag o-nlogn">O(n log n)</span>
+      </div>
+      <div id="sorted-list" class="task-list">
+        <div class="empty-state">No tasks yet. Add some above.</div>
+      </div>
+    </div>
+
+    <!-- GROUPED BY PRIORITY -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Grouped by Priority</span>
+        <span class="complexity-tag o-n">O(n) space</span>
+      </div>
+      <div id="grouped-list">
+        <div class="empty-state">No tasks yet.</div>
+      </div>
+    </div>
+
+    <!-- OVERLAPPING TASKS -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Overlap Detection</span>
+        <span class="complexity-tag o-nlogn">O(n log n)</span>
+      </div>
+      <div id="overlap-list">
+        <div class="empty-state">No overlaps detected.</div>
+      </div>
+    </div>
+
+    <!-- COMPLEXITY TABLE -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Complexity Analysis</span>
+        <span class="complexity-tag o-1">Big O</span>
+      </div>
+      <table class="complexity-table">
+        <thead>
+          <tr>
+            <th>Function</th>
+            <th>Time</th>
+            <th>Space</th>
+            <th>Algorithm</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>sortByStartTime()</td>
+            <td><span class="complexity-tag o-nlogn">O(n log n)</span></td>
+            <td><span class="complexity-tag o-1">O(1)</span></td>
+            <td>Timsort (native)</td>
+          </tr>
+          <tr>
+            <td>groupByPriority()</td>
+            <td><span class="complexity-tag o-n">O(n)</span></td>
+            <td><span class="complexity-tag o-n">O(n)</span></td>
+            <td>Hash Map</td>
+          </tr>
+          <tr>
+            <td>detectOverlaps()</td>
+            <td><span class="complexity-tag o-nlogn">O(n log n)</span></td>
+            <td><span class="complexity-tag o-n">O(n)</span></td>
+            <td>Sort + Sweep</td>
+          </tr>
+          <tr>
+            <td>estimateMemory()</td>
+            <td><span class="complexity-tag o-1">O(1)</span></td>
+            <td><span class="complexity-tag o-1">O(1)</span></td>
+            <td>Calculation</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- MEMORY ESTIMATE -->
+    <div class="card full-width">
+      <div class="card-header">
+        <span class="card-title">Memory Estimation</span>
+        <span class="complexity-tag o-1">Optional Feature</span>
+      </div>
+      <div class="mem-grid">
+        <div class="mem-stat">
+          <div class="mem-stat-label">Total Tasks</div>
+          <div class="mem-stat-value" id="mem-tasks">0</div>
+          <div class="mem-stat-unit">tasks</div>
+        </div>
+        <div class="mem-stat">
+          <div class="mem-stat-label">Est. Heap Usage</div>
+          <div class="mem-stat-value" id="mem-heap">0</div>
+          <div class="mem-stat-unit">bytes</div>
+        </div>
+        <div class="mem-stat">
+          <div class="mem-stat-label">Per Task (avg)</div>
+          <div class="mem-stat-value" id="mem-per">~180</div>
+          <div class="mem-stat-unit">bytes / task</div>
+        </div>
+      </div>
+
+      <!-- Console log -->
+      <div class="panel-title" style="margin-bottom:0.5rem;">// algorithm_log</div>
+      <div class="console" id="console-output">
+        <div class="log-line">// Ready. Waiting for tasks...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  DATA MODEL
+// ============================================================
+/**
+ * Task structure:
+ * { id: number, name: string, start: string, end: string,
+ *   startMin: number, endMin: number, priority: 'High'|'Medium'|'Low' }
+ *
+ * startMin / endMin = minutes since midnight → fast numeric comparison
+ */
+
+let tasks = [];
+let nextId = 1;
+
+// ============================================================
+//  UTILITY
+// ============================================================
+
+/** Convert "HH:MM" to minutes since midnight — O(1) */
+function toMinutes(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+/** Format minutes back to "HH:MM" — O(1) */
+function fromMinutes(min) {
+  const h = String(Math.floor(min / 60)).padStart(2, '0');
+  const m = String(min % 60).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+// ============================================================
+//  1. SORT BY START TIME
+//  Algorithm : Array.prototype.sort() — Timsort (V8)
+//  Time  : O(n log n)
+//  Space : O(1) in-place (V8 may use O(log n) stack for merge)
+// ============================================================
+function sortByStartTime(taskArray) {
+  log('info', `sortByStartTime() called — n=${taskArray.length} → O(n log n) Timsort`);
+  return [...taskArray].sort((a, b) => a.startMin - b.startMin);
+}
+
+// ============================================================
+//  2. GROUP BY PRIORITY
+//  Algorithm : Single-pass hash map accumulation
+//  Time  : O(n)   — one pass through array
+//  Space : O(n)   — output map holds all tasks
+// ============================================================
+function groupByPriority(taskArray) {
+  log('info', `groupByPriority() called — n=${taskArray.length} → O(n) hash map`);
+  // Hash map (plain object) gives O(1) average insert/lookup
+  const map = { High: [], Medium: [], Low: [] };
+  for (const task of taskArray) {
+    map[task.priority].push(task);        // O(1) amortised
+  }
+  return map;
+}
+
+// ============================================================
+//  3. DETECT OVERLAPPING TASKS
+//  Algorithm : Sort by start, then single sweep comparing
+//              each task against the latest end time seen.
+//  Two tasks A, B overlap if A.start < B.end AND B.start < A.end
+//  Time  : O(n log n)  — dominated by sort
+//  Space : O(n)        — output array of pairs
+// ============================================================
+function detectOverlaps(taskArray) {
+  if (taskArray.length < 2) return [];
+
+  // Sort by start time — O(n log n)
+  const sorted = [...taskArray].sort((a, b) => a.startMin - b.startMin);
+  log('info', `detectOverlaps() — sorted ${sorted.length} tasks, sweeping...`);
+
+  const pairs = [];
+
+  // Sweep line: compare each task with ALL following tasks
+  // that haven't yet started after current task ends.
+  // Worst case O(n²) for fully overlapping tasks, but O(n) average
+  // with the early-break optimisation.
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i + 1; j < sorted.length; j++) {
+      // Early exit: if j starts after i ends, all remaining j also won't overlap
+      if (sorted[j].startMin >= sorted[i].endMin) break;
+      // Overlap condition
+      if (sorted[i].startMin < sorted[j].endMin &&
+          sorted[j].startMin < sorted[i].endMin) {
+        pairs.push([sorted[i], sorted[j]]);
+      }
+    }
+  }
+
+  log(pairs.length > 0 ? 'warn' : 'ok',
+    `detectOverlaps() → found ${pairs.length} overlapping pair(s)`);
+  return pairs;
+}
+
+// ============================================================
+//  4. ESTIMATE MEMORY USAGE  (Optional)
+//  Model: each task object holds ~5 string/number fields.
+//  JS overhead per object ~64 bytes (V8 hidden class)
+//  Per field estimate: numbers=8B each (2), strings avg 30B each (3)
+//  Time  : O(1)
+//  Space : O(1)
+// ============================================================
+function estimateMemory(taskArray) {
+  const OBJECT_OVERHEAD = 64;     // bytes, V8 object header
+  const NUMBER_FIELD    = 8;      // 64-bit float
+  const AVG_STRING_BYTES = 30;    // avg chars × 2 (UTF-16) + header
+
+  // Fields per task: id(num), name(str), start(str), end(str),
+  //                  startMin(num), endMin(num), priority(str)
+  const PER_TASK = OBJECT_OVERHEAD +
+                   (3 * NUMBER_FIELD) +    // id, startMin, endMin
+                   (4 * AVG_STRING_BYTES); // name, start, end, priority
+  // ≈ 64 + 24 + 120 = 208 bytes per task (estimate)
+
+  const totalBytes = taskArray.length * PER_TASK;
+  const arrayOverhead = 32 + taskArray.length * 8; // pointer array
+
+  log('info', `estimateMemory() → ~${totalBytes + arrayOverhead} bytes total (O(1) calc)`);
+  return { perTask: PER_TASK, total: totalBytes + arrayOverhead };
+}
+
+// ============================================================
+//  UI HELPERS
+// ============================================================
+
+function addTask() {
+  const name     = document.getElementById('inp-name').value.trim();
+  const start    = document.getElementById('inp-start').value;
+  const end      = document.getElementById('inp-end').value;
+  const priority = document.getElementById('inp-priority').value;
+
+  if (!name) { log('err', 'Task name is required.'); return; }
+
+  const startMin = toMinutes(start);
+  const endMin   = toMinutes(end);
+
+  if (endMin <= startMin) {
+    log('err', `Invalid time range: ${start}–${end}. End must be after start.`);
+    return;
+  }
+
+  tasks.push({ id: nextId++, name, start, end, startMin, endMin, priority });
+  log('ok', `Task added: "${name}" [${start}–${end}] [${priority}]`);
+  document.getElementById('inp-name').value = '';
+  render();
+}
+
+function removeTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  log('info', `Task #${id} removed.`);
+  render();
+}
+
+function loadDemo() {
+  tasks = [];
+  nextId = 1;
+  const demos = [
+    { name: 'Morning Standup',   start: '09:00', end: '09:30', priority: 'High'   },
+    { name: 'Code Review',       start: '09:15', end: '10:00', priority: 'High'   },
+    { name: 'Database Migration',start: '10:30', end: '12:00', priority: 'High'   },
+    { name: 'Lunch Break',       start: '12:00', end: '13:00', priority: 'Low'    },
+    { name: 'Sprint Planning',   start: '11:30', end: '12:30', priority: 'Medium' },
+    { name: 'API Integration',   start: '13:00', end: '15:00', priority: 'Medium' },
+    { name: 'Write Unit Tests',  start: '14:00', end: '16:00', priority: 'Medium' },
+    { name: 'Deploy to Staging', start: '15:30', end: '16:30', priority: 'High'   },
+    { name: 'Documentation',     start: '16:00', end: '17:00', priority: 'Low'    },
+    { name: 'Email Catchup',     start: '08:30', end: '09:00', priority: 'Low'    },
+  ];
+  demos.forEach(d => {
+    tasks.push({
+      id: nextId++,
+      name: d.name,
+      start: d.start,
+      end: d.end,
+      startMin: toMinutes(d.start),
+      endMin: toMinutes(d.end),
+      priority: d.priority
+    });
+  });
+  log('ok', `Loaded ${tasks.length} demo tasks.`);
+  render();
+}
+
+function clearAll() {
+  tasks = [];
+  nextId = 1;
+  log('info', 'All tasks cleared.');
+  render();
+}
+
+function render() {
+  const sorted   = sortByStartTime(tasks);
+  const grouped  = groupByPriority(tasks);
+  const overlaps = detectOverlaps(tasks);
+  const mem      = estimateMemory(tasks);
+
+  // Build set of overlapping task IDs for highlight
+  const overlapIds = new Set();
+  overlaps.forEach(([a, b]) => { overlapIds.add(a.id); overlapIds.add(b.id); });
+
+  // --- Sorted list ---
+  const sortedEl = document.getElementById('sorted-list');
+  if (sorted.length === 0) {
+    sortedEl.innerHTML = '<div class="empty-state">No tasks yet.</div>';
+  } else {
+    sortedEl.innerHTML = sorted.map(t => `
+      <div class="task-row ${t.priority} ${overlapIds.has(t.id) ? 'overlap' : ''}">
+        <div>
+          <div class="task-name">${escHtml(t.name)}</div>
+          <div class="task-time">${t.start} – ${t.end}</div>
+        </div>
+        <span class="priority-badge ${t.priority}">${t.priority}</span>
+        ${overlapIds.has(t.id) ? '<span class="overlap-indicator">⚠ OVERLAP</span>' : ''}
+        <button class="btn btn-danger" onclick="removeTask(${t.id})">✕</button>
+      </div>
+    `).join('');
+  }
+
+  // --- Grouped ---
+  const groupedEl = document.getElementById('grouped-list');
+  const priorities = ['High', 'Medium', 'Low'];
+  const hasAny = priorities.some(p => grouped[p].length > 0);
+  if (!hasAny) {
+    groupedEl.innerHTML = '<div class="empty-state">No tasks yet.</div>';
+  } else {
+    groupedEl.innerHTML = priorities.map(p => {
+      const list = grouped[p];
+      if (list.length === 0) return '';
+      return `
+        <div class="group-section group-${p}">
+          <div class="group-label">
+            ${p}
+            <span class="group-count">${list.length}</span>
+          </div>
+          <div class="group-tasks">
+            ${list.sort((a,b) => a.startMin - b.startMin).map(t => `
+              <div class="task-row ${p}" style="grid-template-columns:1fr auto auto">
+                <div>
+                  <span class="task-name">${escHtml(t.name)}</span>
+                  <span class="task-time" style="margin-left:0.5rem">${t.start}–${t.end}</span>
+                </div>
+                ${overlapIds.has(t.id) ? '<span class="overlap-indicator">⚠</span>' : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // --- Overlaps ---
+  const overlapEl = document.getElementById('overlap-list');
+  if (overlaps.length === 0) {
+    overlapEl.innerHTML = '<div class="empty-state">✓ No overlapping tasks detected.</div>';
+  } else {
+    overlapEl.innerHTML = overlaps.map(([a, b]) => `
+      <div class="overlap-pair">
+        <div class="overlap-pair-title">⚠ "${escHtml(a.name)}" ⟷ "${escHtml(b.name)}"</div>
+        <div class="overlap-pair-info">
+          ${a.start}–${a.end} overlaps with ${b.start}–${b.end}
+          &nbsp;|&nbsp; overlap window: ${fromMinutes(Math.max(a.startMin, b.startMin))}–${fromMinutes(Math.min(a.endMin, b.endMin))}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // --- Memory ---
+  document.getElementById('mem-tasks').textContent = tasks.length;
+  document.getElementById('mem-heap').textContent  = mem.total;
+  document.getElementById('mem-per').textContent   = `~${mem.perTask}`;
+}
+
+function log(type, msg) {
+  const con = document.getElementById('console-output');
+  const ts = new Date().toTimeString().slice(0,8);
+  const cls = type === 'ok' ? 'log-ok' : type === 'warn' ? 'log-warn' : type === 'err' ? 'log-err' : 'log-line';
+  const prefix = type === 'ok' ? '✓' : type === 'warn' ? '⚠' : type === 'err' ? '✗' : '›';
+  const line = document.createElement('div');
+  line.className = cls;
+  line.textContent = `[${ts}] ${prefix} ${msg}`;
+  con.appendChild(line);
+  con.scrollTop = con.scrollHeight;
+  // Keep last 80 lines
+  while (con.children.length > 80) con.removeChild(con.firstChild);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Initial render
+render();
+</script>
+</body>
+</html>
